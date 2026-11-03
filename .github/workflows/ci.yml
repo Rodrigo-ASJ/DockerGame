@@ -23,7 +23,10 @@ jobs:
           cache: 'pnpm'
 
       - name: Install pnpm
-        run: corepack enable && corepack prepare pnpm@11 --activate
+        run: |
+          corepack enable
+          corepack prepare pnpm@11 --activate
+          echo "$(corepack whereis pnpm | awk '{print $1}' | xargs dirname)" >> $GITHUB_PATH
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
