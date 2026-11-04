@@ -117,64 +117,82 @@ export function TerminalPanel({
   return (
     <section
       aria-labelledby="terminal-title"
-      className="flex min-w-0 flex-col rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-lg"
+      className="tc-card tc-wobble-sm relative flex min-w-0 flex-col overflow-hidden p-4 sm:p-6"
     >
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="terminal-title" className="text-lg font-semibold text-slate-100">
-          Terminal simulado
-        </h2>
-        <span className="text-xs text-slate-500">
-          Nada se ejecuta en tu equipo
-        </span>
-      </div>
+      <div aria-hidden="true" className="tc-stripe text-acid" />
+      <div className="relative flex h-full flex-col">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="h-3 w-3 border-2 border-ink bg-acid shadow-[2px_2px_0_#0b0a0a]"
+            />
+            <h2
+              id="terminal-title"
+              className="font-display text-lg leading-none tracking-wide text-bone sm:text-xl"
+            >
+              Terminal simulado
+            </h2>
+          </div>
+          <span className="tc-badge tc-badge--muted">Sandbox aislado</span>
+        </div>
 
-      <div
-        ref={containerRef}
-        aria-hidden="true"
-        data-testid="xterm-container"
-        className="h-72 w-full overflow-hidden rounded-lg border border-slate-800 bg-slate-950 p-3"
-      />
-
-      <div
-        role="log"
-        aria-label="Salida del terminal"
-        aria-live="polite"
-        className="sr-only"
-      >
-        {[WELCOME_ENTRY, ...entries].map((entry, index) => (
-          <p key={`${entry.tone}-${index}`}>{entry.text}</p>
-        ))}
-      </div>
-
-      <form onSubmit={handleSubmit} className="mt-4 flex items-stretch gap-2">
-        <label htmlFor={inputId} className="sr-only">
-          Comando
-        </label>
-        <span
+        <div
+          ref={containerRef}
           aria-hidden="true"
-          className="flex items-center rounded-lg border border-slate-700 bg-slate-950 px-3 font-mono text-sm text-cyan-400"
-        >
-          $
-        </span>
-        <input
-          id={inputId}
-          value={command}
-          onChange={(event) => setCommand(event.target.value)}
-          placeholder="docker ps"
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          disabled={disabled}
-          className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+          data-testid="xterm-container"
+          className="tc-terminal-screen h-80 w-full p-2 md:h-96"
         />
-        <button
-          type="submit"
-          disabled={disabled || command.trim().length === 0}
-          className="rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+
+        <div
+          role="log"
+          aria-label="Salida del terminal"
+          aria-live="polite"
+          className="sr-only"
         >
-          Ejecutar
-        </button>
-      </form>
+          {[WELCOME_ENTRY, ...entries].map((entry, index) => (
+            <p key={`${entry.tone}-${index}`}>{entry.text}</p>
+          ))}
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="mt-4 space-y-2 sm:flex sm:items-stretch sm:gap-2 sm:space-y-0"
+        >
+          <label htmlFor={inputId} className="sr-only">
+            Comando
+          </label>
+          <div className="flex items-stretch gap-2 sm:min-w-0 sm:flex-1">
+            <span
+              aria-hidden="true"
+              className="flex w-10 shrink-0 items-center justify-center border-4 border-ink bg-acid font-mono text-base font-bold text-ink shadow-[3px_3px_0_#0b0a0a]"
+            >
+              $
+            </span>
+            <input
+              id={inputId}
+              value={command}
+              onChange={(event) => setCommand(event.target.value)}
+              placeholder="docker ps"
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              disabled={disabled}
+              className="tc-input min-w-0 flex-1"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={disabled || command.trim().length === 0}
+            className="tc-button w-full px-4 sm:w-auto sm:shrink-0"
+          >
+            Ejecutar
+          </button>
+        </form>
+        <p className="mt-3 text-center font-mono text-[0.6rem] font-bold uppercase tracking-[0.18em] text-bone/55">
+          Nada se ejecuta en tu equipo · Solo simulación
+        </p>
+      </div>
     </section>
   )
 }
