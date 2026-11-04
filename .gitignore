@@ -31,3 +31,7 @@ docs
 specs
 AGENTS.md
 .opencode
+MEMORY.md
+.agents
+skills-lock.json
+opencode.json

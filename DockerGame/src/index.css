@@ -1,1 +1,411 @@
 @import 'tailwindcss';
+
+@theme {
+  --font-display: 'Bungee', Impact, 'Arial Black', sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+
+  --color-ink: #0b0a0a;
+  --color-dungeon: #121011;
+  --color-surface: #221c1f;
+  --color-surface-2: #2b2427;
+  --color-acid: #a3ff00;
+  --color-mutant: #ff007f;
+  --color-bone: #f5f2f4;
+  --color-mud: #5c4d56;
+  --color-radioactive: #ffd166;
+}
+
+:root {
+  /* Tokens oficiales de la identidad Trash Cartoon / Lo-Fi Metal. */
+  --tc-border-width: 5px;
+  --tc-border-color: var(--color-ink);
+  --tc-radius: 6px;
+  --tc-shadow-color: var(--color-ink);
+  --tc-shadow-offset: 7px;
+  --tc-color-bg: var(--color-dungeon);
+  --tc-color-surface: var(--color-surface);
+  --tc-color-primary: var(--color-acid);
+  --tc-color-accent: var(--color-mutant);
+  --tc-color-text: var(--color-bone);
+  --tc-color-muted: var(--color-mud);
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-body);
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: var(--tc-color-bg);
+    background-image: radial-gradient(circle at 10% -10%, rgba(163, 255, 0, 0.1), transparent 38%),
+      radial-gradient(circle at 95% 0%, rgba(255, 0, 127, 0.11), transparent 34%),
+      radial-gradient(var(--tc-border-color) 1.4px, transparent 1.4px);
+    background-size: auto, auto, 10px 10px;
+    background-attachment: fixed;
+    color: var(--tc-color-text);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(245, 242, 244, 0.035) 0,
+      rgba(245, 242, 244, 0.035) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+    opacity: 0.55;
+    mix-blend-mode: soft-light;
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+
+  code,
+  pre,
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  ::selection {
+    background: var(--tc-color-accent);
+    color: var(--tc-color-bg);
+  }
+
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid var(--tc-color-accent);
+    outline-offset: 3px;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Tarjeta base: cartón quemado con borde de rotulador y sombra mal registrada. */
+  .tc-card {
+    position: relative;
+    border: var(--tc-border-width) solid var(--tc-border-color);
+    border-radius: var(--tc-radius);
+    background-color: var(--tc-color-surface);
+    background-image: radial-gradient(rgba(245, 242, 244, 0.055) 1px, transparent 1px);
+    background-size: 6px 6px;
+    box-shadow: var(--tc-shadow-offset) var(--tc-shadow-offset) 0 0 var(--tc-shadow-color);
+  }
+
+  .tc-wobble {
+    border-radius: 16px 6px 20px 8px / 8px 20px 6px 16px;
+  }
+
+  .tc-wobble-sm {
+    border-radius: 10px 4px 13px 5px / 5px 13px 4px 10px;
+  }
+
+  .tc-stripe {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 9px;
+    background: repeating-linear-gradient(90deg, currentColor 0 12px, transparent 12px 20px);
+    opacity: 0.95;
+  }
+
+  .tc-tape::before {
+    content: '';
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    z-index: 2;
+    width: 92px;
+    height: 26px;
+    transform: translateX(-50%) rotate(-3deg);
+    background: rgba(245, 242, 244, 0.72);
+    border-left: 2px dashed rgba(11, 10, 10, 0.28);
+    border-right: 2px dashed rgba(11, 10, 10, 0.28);
+    box-shadow: 0 1px 0 rgba(11, 10, 10, 0.18);
+  }
+
+  .tc-title-shadow {
+    text-shadow: 3px 3px 0 var(--tc-border-color);
+  }
+
+  .tc-kicker {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.32em;
+    line-height: 1.4;
+    text-transform: uppercase;
+    color: var(--tc-color-primary);
+  }
+
+  .tc-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    line-height: 1.4;
+    text-transform: uppercase;
+    color: #b9a8b0;
+  }
+
+  .tc-stamp {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border: 3px solid var(--tc-border-color);
+    border-radius: 7px 3px 9px 4px / 4px 9px 3px 7px;
+    background: var(--tc-color-accent);
+    color: var(--tc-border-color);
+    box-shadow: 3px 3px 0 var(--tc-shadow-color);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    text-transform: uppercase;
+    transform: rotate(2deg);
+  }
+
+  .tc-stamp--acid {
+    background: var(--tc-color-primary);
+  }
+
+  .tc-stamp--bone {
+    background: var(--tc-color-text);
+  }
+
+  .tc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    border: 3px solid var(--tc-border-color);
+    border-radius: 5px 2px 7px 3px / 3px 7px 2px 5px;
+    background: var(--tc-color-primary);
+    color: var(--tc-border-color);
+    box-shadow: 3px 3px 0 var(--tc-shadow-color);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1.1;
+    text-transform: uppercase;
+    transform: rotate(-1deg);
+  }
+
+  .tc-badge--mutant {
+    background: var(--tc-color-accent);
+  }
+
+  .tc-badge--muted {
+    background: var(--tc-color-muted);
+    color: var(--tc-color-text);
+  }
+
+  .tc-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.72rem 1.25rem;
+    border: 4px solid var(--tc-border-color);
+    border-radius: 8px 4px 10px 5px / 5px 10px 4px 8px;
+    background: var(--tc-color-primary);
+    color: var(--tc-border-color);
+    box-shadow: 6px 6px 0 0 var(--tc-shadow-color);
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    transform: rotate(-1deg);
+    transition:
+      transform 80ms ease,
+      box-shadow 80ms ease,
+      background-color 120ms ease,
+      color 120ms ease;
+    cursor: pointer;
+  }
+
+  .tc-button:hover:not(:disabled) {
+    transform: translate(-1px, -1px) rotate(-1deg);
+    box-shadow: 8px 8px 0 0 var(--tc-shadow-color);
+  }
+
+  .tc-button:active:not(:disabled) {
+    transform: translate(6px, 6px) rotate(0deg);
+    box-shadow: 0 0 0 0 var(--tc-shadow-color);
+  }
+
+  .tc-button--mutant {
+    background: var(--tc-color-accent);
+  }
+
+  .tc-button--ghost {
+    background: var(--color-surface-2);
+    color: var(--tc-color-text);
+  }
+
+  .tc-button:disabled {
+    background: var(--color-surface-2);
+    color: #9a8a92;
+    border-color: #6f5f67;
+    box-shadow: 3px 3px 0 var(--tc-shadow-color);
+    transform: none;
+    cursor: not-allowed;
+    opacity: 0.85;
+  }
+
+  .tc-input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.7rem 0.9rem;
+    border: 4px solid var(--tc-border-color);
+    border-radius: 8px 4px 10px 5px / 5px 10px 4px 8px;
+    background: var(--color-ink);
+    color: var(--tc-color-primary);
+    box-shadow:
+      inset 3px 3px 0 rgba(0, 0, 0, 0.55),
+      0 0 0 2px var(--tc-color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 700;
+    outline: none;
+    transition:
+      border-color 100ms ease,
+      box-shadow 100ms ease,
+      background-color 100ms ease;
+  }
+
+  .tc-input::placeholder {
+    color: #9a8a92;
+    font-weight: 400;
+  }
+
+  .tc-input:focus {
+    border-color: var(--tc-color-accent);
+    background: #050404;
+    box-shadow:
+      inset 3px 3px 0 rgba(0, 0, 0, 0.55),
+      4px 4px 0 var(--tc-shadow-color);
+  }
+
+  .tc-input:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .tc-terminal-screen {
+    position: relative;
+    overflow: hidden;
+    border: 4px solid var(--tc-border-color);
+    border-radius: 10px 4px 12px 6px / 6px 12px 4px 10px;
+    background: #050404;
+    box-shadow:
+      inset 0 0 0 2px #2a2326,
+      5px 5px 0 var(--tc-shadow-color);
+  }
+
+  .tc-terminal-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(163, 255, 0, 0.045) 0,
+      rgba(163, 255, 0, 0.045) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  }
+
+  .tc-container-card {
+    position: relative;
+    overflow: hidden;
+    padding: 1rem 1rem 1rem 1.35rem;
+    border: 4px solid var(--tc-border-color);
+    border-radius: 8px 4px 10px 5px / 5px 10px 4px 8px;
+    background-color: #1a1517;
+    background-image: linear-gradient(135deg, rgba(163, 255, 0, 0.09), transparent 58%);
+    box-shadow: 4px 4px 0 var(--tc-shadow-color);
+  }
+
+  .tc-container-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 8px;
+    background: var(--tc-color-primary);
+  }
+
+  .tc-feedback {
+    position: relative;
+    padding: 0.85rem 1rem;
+    border: 4px solid var(--tc-border-color);
+    border-radius: 8px 4px 10px 5px / 5px 10px 4px 8px;
+    box-shadow: 4px 4px 0 var(--tc-shadow-color);
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  .tc-feedback--success {
+    background: var(--tc-color-primary);
+    color: var(--tc-border-color);
+  }
+
+  .tc-feedback--error {
+    background: var(--tc-color-accent);
+    color: var(--tc-border-color);
+  }
+
+  .tc-feedback--info {
+    border-color: var(--tc-color-primary);
+    background: #1d2a12;
+    color: #dcffab;
+  }
+
+  .tc-divider {
+    height: 4px;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--tc-color-muted) 0 8px,
+      transparent 8px 14px
+    );
+  }
+
+  .tc-diagram-step {
+    position: relative;
+  }
+}

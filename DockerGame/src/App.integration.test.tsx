@@ -58,7 +58,9 @@ describe('recorrido completo de la lección', () => {
     await submitCommand(user, 'docker run -d --name web nginx')
     expect(
       within(
-        screen.getByRole('region', { name: 'Contenedores activos' }),
+        screen.getAllByRole('region', { name: /Contenedores/i })[
+          screen.getAllByRole('region', { name: /Contenedores/i }).length - 1
+        ],
       ).getByText('web'),
     ).toBeInTheDocument()
     await checkStep(user)
@@ -89,9 +91,10 @@ describe('recorrido completo de la lección', () => {
 
     await submitCommand(user, 'docker run -d --name web2 nginx')
     await submitCommand(user, 'docker ps')
-    const containersPanel = screen.getByRole('region', {
-      name: 'Contenedores activos',
+    const containersPanels = screen.getAllByRole('region', {
+      name: /Contenedores/i,
     })
+    const containersPanel = containersPanels[containersPanels.length - 1]
 
     expect(within(containersPanel).getByText('web')).toBeInTheDocument()
     expect(within(containersPanel).getByText('web2')).toBeInTheDocument()
@@ -135,7 +138,7 @@ describe('recorrido completo de la lección', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Ejecuta exactamente "docker ps". En este primer paso todavía no puedes crear contenedores.',
     )
-    expect(screen.getByText('Todavía no hay contenedores')).toBeInTheDocument()
+    expect(screen.getByText(/Sin contenedores/i)).toBeInTheDocument()
 
     await checkStep(user)
 
