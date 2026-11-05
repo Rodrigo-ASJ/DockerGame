@@ -33,6 +33,10 @@ describe('level1CreateListLesson', () => {
     expect(level1CreateListLesson.title).toBe('Crear y listar contenedores')
   })
 
+  it('declares the level 1 available commands', () => {
+    expect(level1CreateListLesson.availableCommands).toEqual(['ps', 'run'])
+  })
+
   it('includes student-facing Spanish content', () => {
     expect(level1CreateListLesson.explanation).toContain('contenedor')
     expect(level1CreateListLesson.objective).toContain('nginx')

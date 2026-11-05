@@ -11,6 +11,7 @@ export const level1CreateListLesson: Lesson = {
     'Crear un contenedor a partir de la imagen nginx y comprobar su estado con Docker.',
   explanation:
     'Un contenedor es un proceso aislado que empaqueta una aplicación y sus dependencias. Con "docker run" creas y arrancas un contenedor; con "docker ps" compruebas qué contenedores están activos en este momento.',
+  availableCommands: ['ps', 'run'],
   diagram: {
     title: 'Del comando al contenedor',
     steps: [

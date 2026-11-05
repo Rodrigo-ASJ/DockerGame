@@ -83,6 +83,24 @@ describe('parseCommand', () => {
 
     if (!result.ok) {
       expect(result.error.code).toBe('unsupported-command')
+      expect(result.error.message).toBe(
+        'Comando no soportado. En esta lección usa "docker ps" o "docker run -d --name web nginx".',
+      )
+    }
+  })
+
+  it('rejects docker history and docker build when they are not supported', () => {
+    for (const input of [
+      'docker history nginx:latest',
+      'docker build -t mi-sitio:1.0 .',
+    ]) {
+      const result = parseCommand(input)
+
+      expect(result.ok).toBe(false)
+
+      if (!result.ok) {
+        expect(result.error.code).toBe('unsupported-command')
+      }
     }
   })
 
@@ -152,5 +170,129 @@ describe('parseCommand', () => {
       normalizedCommand: 'docker run -d --name web nginx:inexistente',
       command: { kind: 'run', name: 'web', image: 'nginx:inexistente' },
     })
+  })
+})
+
+const level2Commands = ['ps', 'run', 'images', 'history', 'build'] as const
+
+describe('parseCommand with level 2 commands', () => {
+  it('parses docker images', () => {
+    expect(
+      parseCommand('docker images', { supportedCommands: level2Commands }),
+    ).toEqual({
+      ok: true,
+      normalizedCommand: 'docker images',
+      command: { kind: 'images' },
+    })
+  })
+
+  it('rejects docker images with options', () => {
+    const result = parseCommand('docker images -a', {
+      supportedCommands: level2Commands,
+    })
+
+    expect(result.ok).toBe(false)
+
+    if (!result.ok) {
+      expect(result.error.code).toBe('unsupported-command')
+      expect(result.error.message).toContain('no admite opciones')
+    }
+  })
+
+  it('parses docker history with exactly one image', () => {
+    expect(
+      parseCommand('docker history nginx:latest', {
+        supportedCommands: level2Commands,
+      }),
+    ).toEqual({
+      ok: true,
+      normalizedCommand: 'docker history nginx:latest',
+      command: { kind: 'history', image: 'nginx:latest' },
+    })
+  })
+
+  it('rejects docker history without an image or with more than one', () => {
+    for (const input of [
+      'docker history',
+      'docker history nginx:latest nginx:alpine',
+    ]) {
+      const result = parseCommand(input, {
+        supportedCommands: level2Commands,
+      })
+
+      expect(result.ok).toBe(false)
+
+      if (!result.ok) {
+        expect(result.error.code).toBe('invalid-command-syntax')
+        expect(result.error.message).toContain('sintaxis')
+      }
+    }
+  })
+
+  it('parses docker build with -t and the current context', () => {
+    expect(
+      parseCommand('docker build -t mi-sitio:1.0 .', {
+        supportedCommands: level2Commands,
+      }),
+    ).toEqual({
+      ok: true,
+      normalizedCommand: 'docker build -t mi-sitio:1.0 .',
+      command: { kind: 'build', reference: 'mi-sitio:1.0' },
+    })
+  })
+
+  it('rejects docker build with a different syntax', () => {
+    for (const input of [
+      'docker build mi-sitio:1.0 .',
+      'docker build -t mi-sitio:1.0',
+      'docker build -t',
+      'docker build -t mi-sitio:1.0 ./',
+      'docker build -t mi-sitio:1.0 . extra',
+    ]) {
+      const result = parseCommand(input, {
+        supportedCommands: level2Commands,
+      })
+
+      expect(result.ok).toBe(false)
+
+      if (!result.ok) {
+        expect(result.error.code).toBe('invalid-command-syntax')
+        expect(result.error.message).toContain('sintaxis')
+      }
+    }
+  })
+
+  it('keeps docker ps and docker run unchanged when the level supports them', () => {
+    expect(
+      parseCommand('docker ps', { supportedCommands: level2Commands }),
+    ).toEqual({
+      ok: true,
+      normalizedCommand: 'docker ps',
+      command: { kind: 'ps' },
+    })
+    expect(
+      parseCommand('docker run -d --name web nginx:alpine', {
+        supportedCommands: level2Commands,
+      }),
+    ).toEqual({
+      ok: true,
+      normalizedCommand: 'docker run -d --name web nginx:alpine',
+      command: { kind: 'run', name: 'web', image: 'nginx:alpine' },
+    })
+  })
+
+  it('rejects docker ps and docker run when the level does not support them', () => {
+    for (const input of [
+      'docker ps',
+      'docker run -d --name web nginx',
+    ]) {
+      const result = parseCommand(input, { supportedCommands: ['images'] })
+
+      expect(result.ok).toBe(false)
+
+      if (!result.ok) {
+        expect(result.error.code).toBe('unsupported-command')
+      }
+    }
   })
 })

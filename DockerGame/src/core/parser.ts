@@ -1,9 +1,14 @@
-import type { ParseResult } from './types'
+import { DEFAULT_SUPPORTED_COMMANDS } from './commands'
+import type { CommandKind, ParseResult } from './types'
 
 const CONTAINER_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/
 
 const USAGE =
   'Comando no soportado. En esta lección usa "docker ps" o "docker run -d --name web nginx".'
+
+type ParseOptions = {
+  readonly supportedCommands?: readonly CommandKind[]
+}
 
 export function normalizeCommand(input: string): string {
   return input.trim().split(/\s+/).filter(Boolean).join(' ')
@@ -20,8 +25,27 @@ function unsupported(normalizedCommand: string, message = USAGE): ParseResult {
   }
 }
 
-export function parseCommand(input: string): ParseResult {
+function invalidSyntax(
+  normalizedCommand: string,
+  message: string,
+): ParseResult {
+  return {
+    ok: false,
+    normalizedCommand,
+    error: {
+      code: 'invalid-command-syntax',
+      message,
+    },
+  }
+}
+
+export function parseCommand(
+  input: string,
+  options: ParseOptions = {},
+): ParseResult {
   const normalizedCommand = normalizeCommand(input)
+  const supportedCommands =
+    options.supportedCommands ?? DEFAULT_SUPPORTED_COMMANDS
 
   if (normalizedCommand.length === 0) {
     return unsupported(
@@ -37,6 +61,10 @@ export function parseCommand(input: string): ParseResult {
   }
 
   if (tokens[1] === 'ps') {
+    if (!supportedCommands.includes('ps')) {
+      return unsupported(normalizedCommand)
+    }
+
     if (tokens.length === 2) {
       return {
         ok: true,
@@ -51,10 +79,78 @@ export function parseCommand(input: string): ParseResult {
     )
   }
 
-  if (tokens[1] !== 'run') {
-    return unsupported(normalizedCommand)
+  if (tokens[1] === 'run') {
+    if (!supportedCommands.includes('run')) {
+      return unsupported(normalizedCommand)
+    }
+
+    return parseRun(normalizedCommand, tokens)
   }
 
+  if (tokens[1] === 'images') {
+    if (!supportedCommands.includes('images')) {
+      return unsupported(normalizedCommand)
+    }
+
+    if (tokens.length === 2) {
+      return {
+        ok: true,
+        normalizedCommand,
+        command: { kind: 'images' },
+      }
+    }
+
+    return unsupported(
+      normalizedCommand,
+      'El comando "docker images" no admite opciones ni argumentos.',
+    )
+  }
+
+  if (tokens[1] === 'history') {
+    if (!supportedCommands.includes('history')) {
+      return unsupported(normalizedCommand)
+    }
+
+    if (tokens.length !== 3) {
+      return invalidSyntax(
+        normalizedCommand,
+        'La sintaxis admitida es "docker history <imagen>".',
+      )
+    }
+
+    return {
+      ok: true,
+      normalizedCommand,
+      command: { kind: 'history', image: tokens[2] },
+    }
+  }
+
+  if (tokens[1] === 'build') {
+    if (!supportedCommands.includes('build')) {
+      return unsupported(normalizedCommand)
+    }
+
+    if (tokens.length !== 5 || tokens[2] !== '-t' || tokens[4] !== '.') {
+      return invalidSyntax(
+        normalizedCommand,
+        'La sintaxis admitida es "docker build -t <nombre> .".',
+      )
+    }
+
+    return {
+      ok: true,
+      normalizedCommand,
+      command: { kind: 'build', reference: tokens[3] },
+    }
+  }
+
+  return unsupported(normalizedCommand)
+}
+
+function parseRun(
+  normalizedCommand: string,
+  tokens: readonly string[],
+): ParseResult {
   let detached = false
   let name: string | undefined
   let image: string | undefined
@@ -142,4 +238,3 @@ export function parseCommand(input: string): ParseResult {
     },
   }
 }
-

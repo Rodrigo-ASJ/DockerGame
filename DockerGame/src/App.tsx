@@ -1,15 +1,111 @@
-import { level1CreateListLesson } from './content/lessons/level1-create-list'
+import { useState } from 'react'
+import {
+  curriculum,
+  getLessonById,
+  LESSON_ORDER,
+  type LessonId,
+} from './content/curriculum'
+import { deriveLessonStatuses, firstAvailableLessonId } from './core/progression'
 import { LessonIndex } from './ui/components/LessonIndex'
-import { LessonView } from './ui/components/LessonView'
-import { useLesson } from './ui/hooks/useLesson'
+import { LessonScreen } from './ui/components/LessonScreen'
+import { useProgress } from './ui/hooks/useProgress'
 import type { TerminalFactory } from './ui/terminal/types'
 
 type AppProps = {
   readonly terminalFactory?: TerminalFactory
 }
 
+function initialLessonId(completedLessonIds: readonly string[]): string {
+  try {
+    return firstAvailableLessonId(LESSON_ORDER, completedLessonIds)
+  } catch {
+    return LESSON_ORDER[0] ?? ''
+  }
+}
+
+function prerequisiteTitleFor(
+  lessonId: LessonId,
+  completedLessonIds: readonly string[],
+): string | undefined {
+  const index = LESSON_ORDER.indexOf(lessonId)
+
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const previousId = LESSON_ORDER[i]
+
+    if (!completedLessonIds.includes(previousId)) {
+      return getLessonById(previousId)?.title
+    }
+  }
+
+  return undefined
+}
+
 function App({ terminalFactory }: AppProps = {}) {
-  const lessonState = useLesson(level1CreateListLesson)
+  const { progress, isCompleted, completeLesson } = useProgress()
+  const completedLessonIds = progress.completedLessonIds
+
+  const [activeLessonId, setActiveLessonId] = useState<string>(() =>
+    initialLessonId(completedLessonIds),
+  )
+  const [lockedNotice, setLockedNotice] = useState<string | null>(null)
+
+  const statuses = deriveLessonStatuses({
+    order: LESSON_ORDER,
+    completedLessonIds,
+  })
+
+  const activeLesson = getLessonById(activeLessonId)
+  const isActiveLessonCompleted = activeLesson
+    ? isCompleted(activeLesson.id)
+    : false
+
+  const handleSelectLesson = (lessonId: string) => {
+    setLockedNotice(null)
+    setActiveLessonId(lessonId)
+  }
+
+  const handleLockedLessonAttempt = (lessonId: string) => {
+    const lesson = getLessonById(lessonId)
+    const prerequisite = prerequisiteTitleFor(
+      lessonId as LessonId,
+      completedLessonIds,
+    )
+
+    if (lesson && prerequisite) {
+      setLockedNotice(
+        `Para abrir «${lesson.title}» primero completa «${prerequisite}».`,
+      )
+    }
+  }
+
+  const handleComplete = (lessonId: string) => {
+    completeLesson(lessonId)
+  }
+
+  const items = LESSON_ORDER.map((id) => {
+    const lesson = getLessonById(id)
+
+    if (!lesson) {
+      return null
+    }
+
+    return {
+      id,
+      level: lesson.level,
+      title: lesson.title,
+      status: statuses[id],
+      prerequisiteTitle:
+        statuses[id] === 'locked'
+          ? prerequisiteTitleFor(id as LessonId, completedLessonIds)
+          : undefined,
+    }
+  })
+
+  const levels = curriculum.levels.map((level) => ({
+    number: level.number,
+    title: level.title,
+    subtitle: level.subtitle,
+  }))
 
   return (
     <div className="relative min-h-screen text-bone">
@@ -55,37 +151,36 @@ function App({ terminalFactory }: AppProps = {}) {
         </p>
       </div>
 
+      {lockedNotice && (
+        <div
+          role="alert"
+          className="mx-auto max-w-7xl px-4 py-3 text-center sm:px-8"
+        >
+          <p className="font-mono text-sm font-bold text-bone">{lockedNotice}</p>
+        </div>
+      )}
+
       <main
         id="contenido-principal"
         className="relative mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-8 sm:py-10 lg:grid-cols-[minmax(250px,300px)_minmax(0,1fr)]"
       >
         <LessonIndex
-          items={[
-            {
-              id: level1CreateListLesson.id,
-              level: level1CreateListLesson.level,
-              title: level1CreateListLesson.title,
-              completed: lessonState.isLessonCompleted,
-            },
-          ]}
-          activeLessonId={level1CreateListLesson.id}
+          items={items.filter((item): item is NonNullable<typeof item> => item !== null)}
+          levels={levels}
+          activeLessonId={activeLessonId}
+          onSelectLesson={handleSelectLesson}
+          onLockedLessonAttempt={handleLockedLessonAttempt}
         />
 
-        <LessonView
-          lesson={level1CreateListLesson}
-          simState={lessonState.simState}
-          currentStep={lessonState.currentStep}
-          currentStepNumber={lessonState.currentStepNumber}
-          totalSteps={lessonState.totalSteps}
-          isStepPassed={lessonState.isStepPassed}
-          isLessonCompleted={lessonState.isLessonCompleted}
-          feedback={lessonState.feedback}
-          terminalEntries={lessonState.terminalEntries}
-          onRunCommand={lessonState.runCommand}
-          onCheckStep={lessonState.checkStep}
-          onAdvance={lessonState.advance}
-          terminalFactory={terminalFactory}
-        />
+        {activeLesson && (
+          <LessonScreen
+            key={activeLesson.id}
+            lesson={activeLesson}
+            isLessonCompleted={isActiveLessonCompleted}
+            onComplete={handleComplete}
+            terminalFactory={terminalFactory}
+          />
+        )}
       </main>
 
       <footer className="relative z-10 mt-4 border-t-[5px] border-ink bg-surface">
