@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
 import { createInitialSimState, executeCommand } from '../../core/engine'
+import { curriculum } from '../../content/curriculum'
 import type {
   CommandLogEntry,
   Lesson,
   LessonStep,
   SimState,
 } from '../../core/types'
-import { loadProgress, saveProgress } from '../storage/progressStorage'
 import type { TerminalEntry } from '../terminal/types'
 import type { FeedbackMessage } from '../types'
 
@@ -53,20 +53,32 @@ export type LessonState = {
   readonly isLessonCompleted: boolean
   readonly feedback: FeedbackMessage | null
   readonly terminalEntries: readonly TerminalEntry[]
+  readonly dockerfile: string
+  readonly onDockerfileChange: (value: string) => void
   readonly runCommand: (command: string) => void
   readonly checkStep: () => void
   readonly advance: () => void
 }
 
-export function useLesson(lesson: Lesson): LessonState {
-  const [simState, setSimState] = useState<SimState>(createInitialSimState)
+export function useLesson(
+  lesson: Lesson,
+  options: { readonly isLessonCompleted: boolean; readonly onComplete: (lessonId: string) => void },
+): LessonState {
+  const { isLessonCompleted, onComplete } = options
+  const [simState, setSimState] = useState<SimState>(() =>
+    createInitialSimState({
+      baseImages: curriculum.baseImages,
+      projectFiles: lesson.workspace?.projectFiles,
+    }),
+  )
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [isStepPassed, setIsStepPassed] = useState(false)
   const [feedback, setFeedback] = useState<FeedbackMessage | null>(null)
-  const [progress, setProgress] = useState(() => loadProgress())
+  const [dockerfile, setDockerfile] = useState(
+    lesson.workspace?.initialDockerfile ?? '',
+  )
 
   const currentStep = getStep(lesson, currentStepIndex)
-  const isLessonCompleted = progress.completedLessonIds.includes(lesson.id)
   const terminalEntries = useMemo(
     () => buildTerminalEntries(simState.log),
     [simState.log],
@@ -75,7 +87,9 @@ export function useLesson(lesson: Lesson): LessonState {
   const runCommand = useCallback(
     (command: string) => {
       const result = executeCommand(simState, command, {
+        availableCommands: lesson.availableCommands,
         allowedCommands: currentStep.allowedCommands,
+        dockerfile,
       })
 
       setSimState(result.state)
@@ -86,13 +100,14 @@ export function useLesson(lesson: Lesson): LessonState {
         setFeedback(null)
       }
     },
-    [simState, currentStep, isStepPassed],
+    [simState, currentStep, isStepPassed, dockerfile, lesson.availableCommands],
   )
 
   const checkStep = useCallback(() => {
     const passed = currentStep.checker({
       state: simState,
       log: simState.log,
+      dockerfile,
     })
 
     setIsStepPassed(passed)
@@ -101,7 +116,7 @@ export function useLesson(lesson: Lesson): LessonState {
         ? { tone: 'success', message: currentStep.successMessage }
         : { tone: 'error', message: currentStep.errorHint },
     )
-  }, [currentStep, simState])
+  }, [currentStep, simState, dockerfile])
 
   const advance = useCallback(() => {
     if (!isStepPassed) {
@@ -115,31 +130,14 @@ export function useLesson(lesson: Lesson): LessonState {
     const isLastStep = currentStepIndex === lesson.steps.length - 1
 
     if (isLastStep) {
-      const completedLessonIds = progress.completedLessonIds.includes(lesson.id)
-        ? progress.completedLessonIds
-        : [...progress.completedLessonIds, lesson.id]
-      const nextProgress = { completedLessonIds }
-
-      saveProgress(nextProgress)
-      setProgress(nextProgress)
-      setFeedback({
-        tone: 'success',
-        message:
-          '¡Lección completada! Puedes repetirla cuando quieras; tu progreso queda guardado en el índice.',
-      })
+      onComplete(lesson.id)
       return
     }
 
     setCurrentStepIndex((index) => index + 1)
     setIsStepPassed(false)
     setFeedback(null)
-  }, [
-    currentStepIndex,
-    isStepPassed,
-    lesson.id,
-    lesson.steps.length,
-    progress.completedLessonIds,
-  ])
+  }, [currentStepIndex, isStepPassed, lesson, onComplete])
 
   return {
     lesson,
@@ -152,6 +150,8 @@ export function useLesson(lesson: Lesson): LessonState {
     isLessonCompleted,
     feedback,
     terminalEntries,
+    dockerfile,
+    onDockerfileChange: setDockerfile,
     runCommand,
     checkStep,
     advance,

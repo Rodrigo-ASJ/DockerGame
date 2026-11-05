@@ -1,3 +1,4 @@
+import { parseDockerfile } from '../../core/dockerfile'
 import type {
   CommandKind,
   Lesson,
@@ -7,7 +8,9 @@ import type {
 import type { TerminalEntry, TerminalFactory } from '../terminal/types'
 import type { FeedbackMessage } from '../types'
 import { ConceptDiagram } from './ConceptDiagram'
+import { DockerfileEditor } from './DockerfileEditor'
 import { Feedback } from './Feedback'
+import { ProjectFilesPanel } from './ProjectFilesPanel'
 import { StepControls } from './StepControls'
 import { TerminalPanel } from './TerminalPanel'
 import { VisualPanel } from './VisualPanel'
@@ -15,6 +18,9 @@ import { VisualPanel } from './VisualPanel'
 const COMMAND_LABELS: Record<CommandKind, string> = {
   ps: 'docker ps',
   run: 'docker run',
+  images: 'docker images',
+  history: 'docker history <imagen>',
+  build: 'docker build -t <nombre> .',
 }
 
 type LessonViewProps = {
@@ -27,10 +33,26 @@ type LessonViewProps = {
   readonly isLessonCompleted: boolean
   readonly feedback: FeedbackMessage | null
   readonly terminalEntries: readonly TerminalEntry[]
+  readonly dockerfile: string
+  readonly onDockerfileChange: (value: string) => void
   readonly onRunCommand: (command: string) => void
   readonly onCheckStep: () => void
   readonly onAdvance: () => void
   readonly terminalFactory?: TerminalFactory
+}
+
+function baseReferenceFromDockerfile(dockerfile: string): string | null {
+  const parsed = parseDockerfile(dockerfile)
+
+  if (!parsed.ok || parsed.instructions.length === 0) {
+    return null
+  }
+
+  const fromInstruction = parsed.instructions.find(
+    (instruction) => instruction.kind === 'FROM',
+  )
+
+  return fromInstruction?.args[0] ?? null
 }
 
 export function LessonView({
@@ -43,12 +65,18 @@ export function LessonView({
   isLessonCompleted,
   feedback,
   terminalEntries,
+  dockerfile,
+  onDockerfileChange,
   onRunCommand,
   onCheckStep,
   onAdvance,
   terminalFactory,
 }: LessonViewProps) {
   const isLastStep = currentStepNumber === totalSteps
+  const hasWorkspace = lesson.workspace !== undefined
+  const baseReference = hasWorkspace
+    ? baseReferenceFromDockerfile(dockerfile)
+    : null
 
   return (
     <div className="min-w-0 space-y-7">
@@ -137,14 +165,20 @@ export function LessonView({
           <div className="mt-5 border-4 border-ink bg-ink/40 p-3 shadow-[3px_3px_0_#0b0a0a]">
             <p className="tc-label">Comandos permitidos</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {currentStep.allowedCommands.map((kind) => (
-                <span
-                  key={kind}
-                  className="inline-flex items-center border-2 border-ink bg-acid px-2.5 py-1 font-mono text-[0.68rem] font-bold text-ink shadow-[2px_2px_0_#0b0a0a]"
-                >
-                  {COMMAND_LABELS[kind]}
-                </span>
-              ))}
+              {currentStep.allowedCommands.length === 0 ? (
+                <p className="text-sm leading-relaxed text-bone/75">
+                  Solo editor: edita el Dockerfile y pulsa «Comprobar».
+                </p>
+              ) : (
+                currentStep.allowedCommands.map((kind) => (
+                  <span
+                    key={kind}
+                    className="inline-flex items-center border-2 border-ink bg-acid px-2.5 py-1 font-mono text-[0.68rem] font-bold text-ink shadow-[2px_2px_0_#0b0a0a]"
+                  >
+                    {COMMAND_LABELS[kind]}
+                  </span>
+                ))
+              )}
             </div>
           </div>
 
@@ -174,16 +208,42 @@ export function LessonView({
             >
               Espacio de trabajo
             </h2>
-            <span className="tc-badge tc-badge--muted">Terminal &amp; Runtime</span>
+            <span className="tc-badge tc-badge--muted">
+              {hasWorkspace ? 'Editor &amp; Archivos' : 'Terminal &amp; Runtime'}
+            </span>
           </div>
 
-          <div className="grid gap-7 xl:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)]">
-            <TerminalPanel
-              entries={terminalEntries}
-              onSubmitCommand={onRunCommand}
-              terminalFactory={terminalFactory}
-            />
-            <VisualPanel containers={simState.containers} />
+          <div className="grid gap-7 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+            {hasWorkspace && (
+              <div className="space-y-4">
+                <DockerfileEditor
+                  value={dockerfile}
+                  onChange={onDockerfileChange}
+                />
+                <ProjectFilesPanel
+                  projectFiles={lesson.workspace?.projectFiles ?? []}
+                  baseReference={baseReference}
+                />
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <TerminalPanel
+                entries={terminalEntries}
+                onSubmitCommand={onRunCommand}
+                terminalFactory={terminalFactory}
+              />
+              <VisualPanel
+                containers={simState.containers}
+                images={simState.images}
+                selectedImage={simState.selectedImage}
+                projectFiles={
+                  hasWorkspace ? lesson.workspace.projectFiles : undefined
+                }
+                baseReference={hasWorkspace ? baseReference : null}
+                comparison={hasWorkspace ? lesson.workspace.comparison : undefined}
+              />
+            </div>
           </div>
         </div>
       </section>

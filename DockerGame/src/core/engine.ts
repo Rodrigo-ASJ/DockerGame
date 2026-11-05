@@ -1,19 +1,59 @@
+import { buildImage, formatCommandDisplay } from './build'
+import { ALL_COMMANDS, DEFAULT_SUPPORTED_COMMANDS } from './commands'
+import {
+  formatHistoryTable,
+  formatImagesTable,
+  parseImageReference,
+} from './images'
 import { parseCommand } from './parser'
 import type {
+  BaseImage,
   CommandError,
-  CommandKind,
   CommandLogEntry,
   CommandResult,
   Container,
+  CreateInitialSimStateOptions,
   ExecuteOptions,
+  Image,
   SimState,
+  StartCommand,
 } from './types'
 
-const AVAILABLE_IMAGE = 'nginx'
-const ALL_COMMANDS: readonly CommandKind[] = ['ps', 'run']
+const COMPATIBILITY_BASE_IMAGE: BaseImage = {
+  id: 'nginx-latest',
+  repository: 'nginx',
+  tag: 'latest',
+  reference: 'nginx:latest',
+  layers: [],
+  defaultCommand: ['/docker-entrypoint.sh', 'nginx', '-g', 'daemon off;'],
+}
 
 function commandError(code: CommandError['code'], message: string): CommandError {
   return { code, message }
+}
+
+function toStartCommand(command: readonly string[]): StartCommand {
+  return {
+    entrypoint: null,
+    cmd: command,
+    entrypointForm: null,
+    cmdForm: 'exec',
+    final: command,
+    display: formatCommandDisplay(command),
+  }
+}
+
+function toBaseImage(baseImage: BaseImage): Image {
+  return {
+    id: baseImage.id,
+    repository: baseImage.repository,
+    tag: baseImage.tag,
+    reference: baseImage.reference,
+    origin: 'base',
+    baseReference: null,
+    layers: baseImage.layers,
+    startCommand: toStartCommand(baseImage.defaultCommand),
+  }
 }
 
 function formatContainers(containers: readonly Container[]): readonly string[] {
@@ -30,11 +70,21 @@ function formatContainers(containers: readonly Container[]): readonly string[] {
   ]
 }
 
-export function createInitialSimState(): SimState {
+export function createInitialSimState(
+  options: CreateInitialSimStateOptions = {},
+): SimState {
+  const baseImages = options.baseImages ?? [COMPATIBILITY_BASE_IMAGE]
+
   return {
     containers: [],
+    images: baseImages.map(toBaseImage),
+    projectFiles: options.projectFiles ?? [],
+    builds: [],
+    selectedImage: null,
     lastError: null,
     nextContainerNumber: 1,
+    nextImageNumber: 1,
+    nextBuildNumber: 1,
     log: [],
   }
 }
@@ -44,12 +94,15 @@ export function executeCommand(
   rawCommand: string,
   options: ExecuteOptions = {},
 ): CommandResult {
-  const parsed = parseCommand(rawCommand)
+  const availableCommands =
+    options.availableCommands ?? DEFAULT_SUPPORTED_COMMANDS
+  const parsed = parseCommand(rawCommand, {
+    supportedCommands: availableCommands,
+  })
   const allowedCommands = options.allowedCommands ?? ALL_COMMANDS
   const containerCountBefore = state.containers.length
 
-  let containers = state.containers
-  let nextContainerNumber = state.nextContainerNumber
+  let nextState = state
   let error: CommandError | null = null
   let lines: readonly string[] = []
 
@@ -65,27 +118,95 @@ export function executeCommand(
       )
     } else if (command.kind === 'ps') {
       lines = formatContainers(state.containers)
-    } else if (state.containers.some((container) => container.name === command.name)) {
-      error = commandError(
-        'duplicate-name',
-        `Ya existe un contenedor llamado "${command.name}".`,
-      )
-    } else if (command.image !== AVAILABLE_IMAGE) {
-      error = commandError(
-        'image-not-found',
-        `No se encontró la imagen "${command.image}". En esta lección solo está disponible "nginx".`,
-      )
-    } else {
-      const container: Container = {
-        id: `container-${nextContainerNumber}`,
-        name: command.name,
-        image: command.image,
-        status: 'running',
-      }
+    } else if (command.kind === 'run') {
+      if (
+        state.containers.some((container) => container.name === command.name)
+      ) {
+        error = commandError(
+          'duplicate-name',
+          `Ya existe un contenedor llamado "${command.name}".`,
+        )
+      } else {
+        const parsedReference = parseImageReference(command.image)
+        const reference = parsedReference.ok
+          ? parsedReference.reference
+          : command.image
+        const image = parsedReference.ok
+          ? state.images.find(
+              (candidate) => candidate.reference === parsedReference.reference,
+            )
+          : undefined
 
-      containers = [...state.containers, container]
-      nextContainerNumber += 1
-      lines = [container.id]
+        if (image === undefined) {
+          const lastAttempt = [...state.builds]
+            .reverse()
+            .find((build) => build.reference === reference)
+
+          if (lastAttempt !== undefined && !lastAttempt.ok) {
+            error = commandError(
+              'image-build-failed',
+              `No se puede ejecutar "${command.image}": su construcción falló. Revisa el Dockerfile y vuelve a construir la imagen.`,
+            )
+          } else {
+            error = commandError(
+              'image-not-found',
+              `No se encontró la imagen "${command.image}".`,
+            )
+          }
+        } else {
+          const hasStartCommand =
+            image.origin === 'built' || image.layers.length > 0
+          const container: Container = {
+            id: `container-${state.nextContainerNumber}`,
+            name: command.name,
+            image: command.image,
+            status: 'running',
+            ...(hasStartCommand ? { command: image.startCommand.final } : {}),
+          }
+
+          nextState = {
+            ...state,
+            containers: [...state.containers, container],
+            nextContainerNumber: state.nextContainerNumber + 1,
+          }
+          lines =
+            image.origin === 'built'
+              ? [
+                  container.id,
+                  `Comando de arranque: ${image.startCommand.display}`,
+                ]
+              : [container.id]
+        }
+      }
+    } else if (command.kind === 'images') {
+      lines = formatImagesTable(state.images)
+    } else if (command.kind === 'history') {
+      const parsedReference = parseImageReference(command.image)
+      const image = parsedReference.ok
+        ? state.images.find(
+            (candidate) => candidate.reference === parsedReference.reference,
+          )
+        : undefined
+
+      if (image === undefined) {
+        error = commandError(
+          'image-not-found',
+          `No se encontró la imagen "${command.image}".`,
+        )
+      } else {
+        nextState = { ...state, selectedImage: image.reference }
+        lines = formatHistoryTable(image)
+      }
+    } else {
+      const buildResult = buildImage(
+        state,
+        command.reference,
+        options.dockerfile ?? '',
+      )
+
+      nextState = buildResult.state
+      lines = buildResult.lines
+      error = buildResult.error
     }
   }
 
@@ -101,20 +222,19 @@ export function executeCommand(
     lines,
     error,
     containerCountBefore,
-    containerCountAfter: containers.length,
+    containerCountAfter: nextState.containers.length,
   }
 
-  const nextState: SimState = {
-    containers,
+  const finalState: SimState = {
+    ...nextState,
     lastError: error,
-    nextContainerNumber,
     log: [...state.log, logEntry],
   }
 
   return {
     ok: error === null,
     lines,
-    state: nextState,
+    state: finalState,
     error,
   }
 }
